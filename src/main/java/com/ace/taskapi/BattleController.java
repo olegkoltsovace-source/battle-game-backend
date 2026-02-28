@@ -93,6 +93,7 @@ public class BattleController {
         return battle;
     }
 
+    // ── handleSlot2Action ────────────────────────────────────────────────────────
     private void handleSlot2Action(String action) {
         if (action == null || action.equals("idle")) {
             battle.setSlot2Result("Player did nothing.");
@@ -100,13 +101,14 @@ public class BattleController {
         }
 
         int damage = 0;
+        int rageChange = battle.getRageChange(); // carry forward from slot1
         String result = "";
 
         switch (action) {
             case "punch":
                 damage = (int) (5 + Math.random() * 6);
                 battle.setOpponentHP(battle.getOpponentHP() - damage);
-                battle.setPlayerRage(battle.getPlayerRage() + 3);
+                rageChange += 3;
                 battle.setDamageDealtToOpponent(battle.getDamageDealtToOpponent() + damage);
                 battle.setTotalDamageDealtByPlayer(battle.getTotalDamageDealtByPlayer() + damage);
                 result = "Player punched for " + damage + " damage! (+3 rage)";
@@ -115,7 +117,7 @@ public class BattleController {
             case "kick":
                 damage = (int) (5 + Math.random() * 6);
                 battle.setOpponentHP(battle.getOpponentHP() - damage);
-                battle.setPlayerRage(battle.getPlayerRage() + 3);
+                rageChange += 3;
                 battle.setDamageDealtToOpponent(battle.getDamageDealtToOpponent() + damage);
                 battle.setTotalDamageDealtByPlayer(battle.getTotalDamageDealtByPlayer() + damage);
                 result = "Player kicked for " + damage + " damage! (+3 rage)";
@@ -123,41 +125,41 @@ public class BattleController {
 
             case "rageAction":
                 if (!battle.canRageStrike()) {
-                    result = "Not enough rage! Need " + battle.getRageStrikeThreshold() + ".";
+                    result = "Not enough rage!";
                     break;
                 }
                 damage = (int) (20 + Math.random() * 10);
+                int rageBefore = battle.getPlayerRage() + rageChange;
                 battle.setOpponentHP(battle.getOpponentHP() - damage);
                 battle.setPlayerHP(battle.getPlayerHP() - 3);
+                rageChange = -rageBefore; // rage resets to 0
                 battle.setPlayerRage(0);
                 battle.setDamageDealtToOpponent(battle.getDamageDealtToOpponent() + damage);
                 battle.setTotalDamageDealtByPlayer(battle.getTotalDamageDealtByPlayer() + damage);
-                result = "RAGE STRIKE! " + damage + " damage! Rage reset.";
+                result = "RAGE STRIKE! " + damage + " damage! Rage reset to 0.";
                 break;
 
             case "heal":
                 int rageCost = 8;
                 if (battle.getPlayerRage() < rageCost) {
-                    result = "Not enough rage to heal! Need " + rageCost + ".";
+                    result = "Not enough rage to heal!";
                     break;
                 }
                 int healAmount = (int) (8 + Math.random() * 8);
-                battle.setPlayerHP(battle.getPlayerHP() + healAmount);
-                battle.setPlayerRage(battle.getPlayerRage() - rageCost);
-                battle.setRageChange(battle.getRageChange() - rageCost);
+                battle.setPlayerHP(Math.min(battle.getMaxHP(), battle.getPlayerHP() + healAmount));
+                rageChange -= rageCost;
                 battle.setHealAmount(healAmount);
                 result = "Player heals " + healAmount + " HP! (-" + rageCost + " rage)";
                 break;
 
             case "block":
-                // Block in slot2 costs small rage but prepares for next turn
-                battle.setPlayerRage(Math.max(0, battle.getPlayerRage() - 2));
-                result = "Player braces for next attack. (-2 rage)";
+                rageChange -= 2;
+                result = "Player braces. (-2 rage)";
                 break;
 
             case "dodge":
-                battle.setPlayerRage(Math.max(0, battle.getPlayerRage() - 6));
-                result = "Player dodges into position. (-6 rage)";
+                rageChange -= 6;
+                result = "Player dodges. (-6 rage)";
                 break;
 
             default:
@@ -165,11 +167,11 @@ public class BattleController {
                 break;
         }
 
+        // Apply final rage change
+        battle.setPlayerRage(Math.max(0, Math.min(battle.getMaxRage(), battle.getPlayerRage() + rageChange)));
+        battle.setRageChange(rageChange);
         battle.setSlot2Result(result);
-
-        battle.setLastAction(
-                (battle.getLastAction() != null ? battle.getLastAction() + " | " : "") + result
-        );
+        battle.setLastAction((battle.getLastAction() != null ? battle.getLastAction() + " | " : "") + result);
     }
 
     private String determineOpponentIntent() {
@@ -242,14 +244,17 @@ public class BattleController {
         return battle;
     }
 
+    // ── handlePlayerAction ───────────────────────────────────────────────────────
     private void handlePlayerAction(String action) {
         int damage = 0;
+        battle.setRageChange(0); // reset each action
 
         switch (action) {
             case "punch":
                 damage = (int) (5 + Math.random() * 6);
                 battle.setOpponentHP(battle.getOpponentHP() - damage);
                 battle.setPlayerRage(battle.getPlayerRage() + 3);
+                battle.setRageChange(3);
                 battle.setDamageDealtToOpponent(damage);
                 battle.setTotalDamageDealtByPlayer(battle.getTotalDamageDealtByPlayer() + damage);
                 battle.setLastAction("Player punched for " + damage + " damage!");
@@ -259,6 +264,7 @@ public class BattleController {
                 damage = (int) (5 + Math.random() * 6);
                 battle.setOpponentHP(battle.getOpponentHP() - damage);
                 battle.setPlayerRage(battle.getPlayerRage() + 3);
+                battle.setRageChange(3);
                 battle.setDamageDealtToOpponent(damage);
                 battle.setTotalDamageDealtByPlayer(battle.getTotalDamageDealtByPlayer() + damage);
                 battle.setLastAction("Player kicked for " + damage + " damage!");
@@ -270,8 +276,10 @@ public class BattleController {
                     break;
                 }
                 damage = (int) (20 + Math.random() * 10);
+                int rageBefore = battle.getPlayerRage();
                 battle.setOpponentHP(battle.getOpponentHP() - damage);
-                battle.setPlayerHP(battle.getPlayerHP() - 3); // health cost
+                battle.setPlayerHP(battle.getPlayerHP() - 3);
+                battle.setRageChange(-rageBefore); // rage resets to 0
                 battle.setPlayerRage(0);
                 battle.setDamageDealtToOpponent(damage);
                 battle.setTotalDamageDealtByPlayer(battle.getTotalDamageDealtByPlayer() + damage);
@@ -279,101 +287,104 @@ public class BattleController {
                 break;
 
             case "block":
-                battle.setSlot1("block"); // mark as defending for opponent resolution
+                battle.setSlot1("block");
+                battle.setRageChange(0);
                 battle.setLastAction("Player is defending!");
-                break;
-
-            case "heal":
-                battle.setSlot1("heal");
-                battle.setLastAction("Player is healing!");
                 break;
 
             default:
                 battle.setLastAction("Unknown action: " + action);
-                System.out.println("Unknown action: '" + action + "'");
                 break;
         }
     }
 
+    // ── handleOpponentAction ─────────────────────────────────────────────────────
     private void handleOpponentAction() {
         String intent = battle.getOpponentIntent();
         String currentAction = battle.getLastAction() != null ? battle.getLastAction() : "";
         String separator = currentAction.isEmpty() ? "" : " | ";
         boolean playerBlocking = "block".equals(battle.getSlot1());
         boolean playerDodging = "dodge".equals(battle.getSlot1());
-        boolean playerInterrupting = "punch".equals(battle.getSlot1()) ||
-                "kick".equals(battle.getSlot1());
-        boolean slot1IsIdle = battle.getSlot1() == null ||
-                "idle".equals(battle.getSlot1());
-        int damage = 0;
+        boolean playerInterrupting = "punch".equals(battle.getSlot1()) || "kick".equals(battle.getSlot1());
 
-        if (playerBlocking) {
-            battle.setPlayerRage(battle.getPlayerRage() - 4);
-        } else if (playerDodging) {
-            battle.setPlayerRage(battle.getPlayerRage() - 6);
-        }
+        int damage = 0;
+        int rageChange = 0; // track net rage change for this resolution
 
         switch (intent != null ? intent : "attack") {
             case "attack":
                 damage = (int) (5 + Math.random() * 6);
+                int blockedAmount = 0;
+
                 if (playerBlocking) {
-                    damage = damage / 2;
-                    battle.setPlayerRage(battle.getPlayerRage() - 4); // block costs rage
+                    blockedAmount = damage / 2;
+                    damage = damage - blockedAmount;
+                    rageChange -= 4; // block costs rage
+                    battle.setBlockedAmount(blockedAmount);
                     battle.setSlot1Result("Block reduced damage to " + damage + "! (-4 rage)");
                 } else if (playerDodging) {
                     damage = 0;
-                    battle.setPlayerRage(battle.getPlayerRage() + 2); // dodge gives momentum
+                    rageChange += 2; // dodge gives momentum
+                    battle.setBlockedAmount(0);
                     battle.setSlot1Result("Dodge! Attack avoided completely! (+2 rage)");
                 } else if (playerInterrupting) {
-                    // Both hit each other — a trade
                     int counterDamage = (int) (3 + Math.random() * 4);
                     battle.setOpponentHP(battle.getOpponentHP() - counterDamage);
                     battle.setDamageDealtToOpponent(counterDamage);
-                    battle.setPlayerRage(battle.getPlayerRage() + 3);
+                    rageChange += 3;
                     battle.setSlot1Result("Trade! Dealt " + counterDamage + " while taking hit! (+3 rage)");
                 } else {
-                    // Took hit idle — pain rage
                     battle.setSlot1Result("Player took the hit!");
                 }
+
                 if (damage > 0) {
                     battle.setPlayerHP(battle.getPlayerHP() - damage);
                     battle.setDamageDealtToPlayer(damage);
-                    battle.setPlayerRage(battle.getPlayerRage() + 5); // pain fuels rage
+                    rageChange += 5; // pain fuels rage
                 }
+
                 battle.setLastAction(separator + "Opponent attacked for " + damage + " damage!");
                 break;
 
             case "fireball":
                 damage = (int) (12 + Math.random() * 8);
+                int fireballBlocked = 0;
+
                 if (playerBlocking) {
-                    damage = (int) (damage * 0.6);
-                    battle.setPlayerRage(battle.getPlayerRage() - 4);
+                    fireballBlocked = (int) (damage * 0.4);
+                    damage = damage - fireballBlocked;
+                    rageChange -= 4;
+                    battle.setBlockedAmount(fireballBlocked);
                     battle.setSlot1Result("Block partially absorbed fireball! " + damage + " damage taken. (-4 rage)");
                 } else if (playerDodging) {
                     damage = 0;
-                    battle.setPlayerRage(battle.getPlayerRage() + 2);
+                    rageChange += 2;
+                    battle.setBlockedAmount(0);
                     battle.setSlot1Result("Dodge! Fireball avoided! (+2 rage)");
                 }
+
                 if (damage > 0) {
                     battle.setPlayerHP(battle.getPlayerHP() - damage);
                     battle.setDamageDealtToPlayer(damage);
-                    battle.setPlayerRage(battle.getPlayerRage() + 5);
+                    rageChange += 5;
                 }
+
                 battle.setLastAction(separator + "Opponent casts fireball for " + damage + " damage!");
                 break;
 
             case "heal":
                 int healAmount = (int) (8 + Math.random() * 8);
+
                 if ("punch".equals(battle.getSlot1()) || "kick".equals(battle.getSlot1())) {
                     int interruptDamage = (int) (3 + Math.random() * 4);
                     healAmount = healAmount / 2;
                     battle.setOpponentHP(battle.getOpponentHP() - interruptDamage);
                     battle.setDamageDealtToOpponent(interruptDamage);
-                    battle.setPlayerRage(battle.getPlayerRage() + 3); // reward for interrupting
-                    battle.setSlot1Result("Interrupted healing! (-" + interruptDamage + " opponent HP, heals only " + healAmount + ") (+3 rage)");
+                    rageChange += 3;
+                    battle.setSlot1Result("Interrupted healing! (-" + interruptDamage + " opponent HP) (+3 rage)");
                 } else {
-                    battle.setSlot1Result("Opponent healed fully — consider interrupting next time!");
+                    battle.setSlot1Result("Opponent healed fully.");
                 }
+
                 battle.setOpponentHP(battle.getOpponentHP() + healAmount);
                 battle.setHealAmount(healAmount);
                 battle.setLastAction(separator + "Opponent heals for " + healAmount + " HP!");
@@ -381,13 +392,17 @@ public class BattleController {
 
             case "charge":
                 battle.setLastAction(separator + "Opponent is charging power...");
-                battle.setSlot1Result("Opponent is charging — attack now for bonus damage!");
-                // Reward player for attacking during charge
+                battle.setSlot1Result("Opponent charging — attack now!");
+
                 if ("punch".equals(battle.getSlot1()) || "kick".equals(battle.getSlot1())) {
-                    battle.setPlayerRage(battle.getPlayerRage() + 2);
+                    rageChange += 2;
                 }
                 break;
         }
+
+        // Apply net rage change
+        battle.setPlayerRage(Math.max(0, Math.min(battle.getMaxRage(), battle.getPlayerRage() + rageChange)));
+        battle.setRageChange(rageChange);
 
         // Reset for next turn
         battle.setOpponentIntent(null);

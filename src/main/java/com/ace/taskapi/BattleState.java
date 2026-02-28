@@ -6,6 +6,9 @@ public class BattleState {
     private int playerHP = 100;
     private int opponentHP = 100;
     private int playerRage = 0;
+    private int blockedAmount;
+    private int maxHP = 100;
+    private int maxRage = 30;
     private static final int MAX_HP = 100;
     private static final int MAX_RAGE = 30;
     private static final int RAGE_STRIKE_THRESHOLD = 20;
@@ -36,6 +39,9 @@ public class BattleState {
 
     public int getOpponentHP() { return opponentHP; }
     public void setOpponentHP(int opponentHP) { this.opponentHP = Math.max(0, Math.min(MAX_HP, opponentHP)); }
+
+    public int getBlockedAmount() { return blockedAmount; }
+    public void setBlockedAmount(int blockedAmount) { this.blockedAmount = blockedAmount; }
 
     public int getPlayerRage() { return playerRage; }
     public void setPlayerRage(int playerRage) { this.playerRage = Math.max(0, Math.min(MAX_RAGE, playerRage)); }
