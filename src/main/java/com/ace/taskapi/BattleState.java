@@ -3,35 +3,38 @@ package com.ace.taskapi;
 public class BattleState {
 
     // ── Core stats ─────────────────────────────────────────────
-    private int playerHP = 100;
-    private int opponentHP = 100;
-    private int playerRage = 0;
+    private int playerHP     = 100;
+    private int opponentHP   = 100;
+    private int playerRage   = 0;
+    private int opponentRage = MAX_RAGE;  // opponent starts at full rage — the player can drain it
     private int blockedAmount;
-    private int maxHP = 100;
-    private int maxRage = 30;
-    private static final int MAX_HP = 100;
-    private static final int MAX_RAGE = 30;
+    private int maxHP        = 100;
+    private int maxRage      = 30;
+    private static final int MAX_HP              = 100;
+    private static final int MAX_RAGE            = 30;
     private static final int RAGE_STRIKE_THRESHOLD = 20;
+    private static final int KICK_RAGE_DRAIN     = 7;   // how much rage kick steals from opponent
 
     // ── Turn state ──────────────────────────────────────────────
     private String opponentIntent = null; // "attack" | "fireball" | "heal" | "charge"
-    private String slot1 = null;          // player's reaction during opponent action
-    private String slot2 = null;          // player's action after opponent action
-    private int timeWindow = 4;           // seconds player has to queue actions
+    private String slot1          = null; // player's reaction during opponent action
+    private String slot2          = null; // player's action after opponent action
+    private int    timeWindow     = 4;    // seconds player has to queue actions
 
     // ── Resolution results (sent to frontend each turn) ─────────
-    private int damageDealtToOpponent = 0;
-    private int damageDealtToPlayer = 0;
-    private int rageChange = 0;
-    private int healAmount = 0;
-    private String slot1Result = null;
-    private String slot2Result = null;
-    private String lastAction = null;
+    private int    damageDealtToOpponent = 0;
+    private int    damageDealtToPlayer   = 0;
+    private int    rageChange            = 0;  // net player rage change this turn
+    private int    opponentRageDrained   = 0;  // how much rage the kick stole this turn
+    private int    healAmount            = 0;
+    private String slot1Result           = null;
+    private String slot2Result           = null;
+    private String lastAction            = null;
 
     // ── Battle status ───────────────────────────────────────────
-    private boolean battleOver = false;
-    private String winner = null;
-    private int totalDamageDealtByPlayer = 0;
+    private boolean battleOver              = false;
+    private String  winner                  = null;
+    private int     totalDamageDealtByPlayer = 0;
 
     // ── Getters and setters ─────────────────────────────────────
     public int getPlayerHP() { return playerHP; }
@@ -46,8 +49,15 @@ public class BattleState {
     public int getPlayerRage() { return playerRage; }
     public void setPlayerRage(int playerRage) { this.playerRage = Math.max(0, Math.min(MAX_RAGE, playerRage)); }
 
+    public int getOpponentRage() { return opponentRage; }
+    public void setOpponentRage(int opponentRage) { this.opponentRage = Math.max(0, Math.min(MAX_RAGE, opponentRage)); }
+
+    public int getOpponentRageDrained() { return opponentRageDrained; }
+    public void setOpponentRageDrained(int opponentRageDrained) { this.opponentRageDrained = opponentRageDrained; }
+
     public int getMaxRage() { return MAX_RAGE; }
     public int getRageStrikeThreshold() { return RAGE_STRIKE_THRESHOLD; }
+    public int getKickRageDrain() { return KICK_RAGE_DRAIN; }
     public int getMaxHP() { return MAX_HP; }
 
     public String getOpponentIntent() { return opponentIntent; }
