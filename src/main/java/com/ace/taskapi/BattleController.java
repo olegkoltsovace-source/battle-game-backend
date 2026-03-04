@@ -1,6 +1,7 @@
 package com.ace.taskapi;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Optional;
@@ -17,6 +18,14 @@ public class BattleController {
 
     @Autowired
     private BattleRepository battleRepository;
+
+    @RestController
+    public class HealthController {
+        @GetMapping("/api/health")
+        public ResponseEntity<String> health() {
+            return ResponseEntity.ok("ok");
+        }
+    }
 
     @PostMapping("/start")
     public BattleState startBattle() {
