@@ -19,14 +19,6 @@ public class BattleController {
     @Autowired
     private BattleRepository battleRepository;
 
-    @RestController
-    public class HealthController {
-        @GetMapping("/api/health")
-        public ResponseEntity<String> health() {
-            return ResponseEntity.ok("ok");
-        }
-    }
-
     @PostMapping("/start")
     public BattleState startBattle() {
         battle = new BattleState();
@@ -43,39 +35,18 @@ public class BattleController {
 
     @PostMapping("/react")
     public BattleState react(@RequestBody ReactRequest request) {
-
         String slot1 = request.getSlot1() != null ? request.getSlot1() : "idle";
-        String slot2 = request.getSlot2() != null ? request.getSlot2() : "idle";
-
-        // Sanitize invalid combinations server-side
-        boolean slot1Defensive   = slot1.equals("block") || slot1.equals("dodge");
-        boolean slot2Defensive   = slot2.equals("block") || slot2.equals("dodge");
-        boolean slot1IsOffensive = slot1.equals("punch") || slot1.equals("kick");
-
-        if (slot1Defensive && slot2Defensive)   slot2 = "idle";
-        if (slot1IsOffensive && slot2Defensive) slot2 = "idle";
-        if (slot1.equals("heal") && slot2.equals("heal")) slot2 = "idle";
-
-        System.out.println("Slot1: " + slot1 + " | Slot2: " + slot2);
 
         battle.setSlot1(slot1);
-        battle.setSlot2(slot2);
 
-        // Reset per-turn result fields
         battle.setDamageDealtToOpponent(0);
         battle.setDamageDealtToPlayer(0);
         battle.setHealAmount(0);
         battle.setOpponentRageDrained(0);
         battle.setSlot1Result(null);
-        battle.setSlot2Result(null);
 
-        // Resolve slot1 — player reacts to the opponent's telegraphed action
         handleOpponentAction();
 
-        // Resolve slot2 — player's follow-up after the exchange
-        handleSlot2Action(slot2);
-
-        // Check battle over after both slots resolve
         if (battle.getOpponentHP() <= 0) {
             battle.setBattleOver(true);
             battle.setWinner("player");
@@ -84,7 +55,6 @@ public class BattleController {
             battle.setWinner("opponent");
         }
 
-        // Opponent immediately telegraphs next intent so the player feels constant pressure
         String nextIntent = determineOpponentIntent();
         battle.setOpponentIntent(nextIntent);
         System.out.println("Opponent next intent: " + nextIntent);
@@ -93,14 +63,12 @@ public class BattleController {
     }
 
     // ── handlePlayerAction ───────────────────────────────────────────────────────
-    // Handles the player's main turn action (the action button row, before telegraph)
     private void handlePlayerAction(String action) {
         int damage = 0;
         battle.setRageChange(0);
         battle.setOpponentRageDrained(0);
 
         switch (action) {
-
             case "punch":
                 damage = (int) (5 + Math.random() * 6);
                 battle.setOpponentHP(battle.getOpponentHP() - damage);
@@ -112,15 +80,11 @@ public class BattleController {
                 break;
 
             case "kick":
-                // Kick drains rage from the opponent and transfers it to the player.
-                // If the opponent has no rage, nothing is transferred — player must pay attention.
                 int opponentRageBeforeKick = battle.getOpponentRage();
-
                 if (opponentRageBeforeKick <= 0) {
                     battle.setLastAction("Kick connects but opponent has no rage to drain!");
                     break;
                 }
-
                 int rageDrained = Math.min(battle.getKickRageDrain(), opponentRageBeforeKick);
                 battle.setOpponentRage(battle.getOpponentRage() - rageDrained);
                 battle.setPlayerRage(battle.getPlayerRage() + rageDrained);
@@ -130,19 +94,19 @@ public class BattleController {
                 break;
 
             case "rageAction":
-                if (!battle.canRageStrike()) {
-                    battle.setLastAction("Not enough rage!");
-                    break;
-                }
                 damage = (int) (20 + Math.random() * 10);
-                int rageBeforeStrike = battle.getPlayerRage();
                 battle.setOpponentHP(battle.getOpponentHP() - damage);
                 battle.setPlayerHP(battle.getPlayerHP() - 3);
-                battle.setRageChange(-rageBeforeStrike); // rage resets to 0
                 battle.setPlayerRage(0);
-                battle.setDamageDealtToOpponent(damage);
+                battle.setDamageDealtToOpponent(battle.getDamageDealtToOpponent() + damage);
                 battle.setTotalDamageDealtByPlayer(battle.getTotalDamageDealtByPlayer() + damage);
-                battle.setLastAction("Player unleashes rage strike for " + damage + " damage!");
+                break;
+
+            case "heal":
+                int healAmount = (int) (8 + Math.random() * 8);
+                battle.setPlayerHP(Math.min(battle.getMaxHP(), battle.getPlayerHP() + healAmount));
+                battle.setPlayerRage(battle.getPlayerRage() - 8);
+                battle.setHealAmount(healAmount);
                 break;
 
             case "block":
@@ -157,109 +121,40 @@ public class BattleController {
         }
     }
 
-    // ── handleSlot2Action ────────────────────────────────────────────────────────
-    // Handles the player's follow-up action in the react phase (slot2)
-    private void handleSlot2Action(String action) {
-        if (action == null || action.equals("idle")) {
-            battle.setSlot2Result("Player did nothing.");
-            return;
+    // ── applyPlayerHealOrRage ────────────────────────────────────────────────────
+    // Called inside handleOpponentAction when player chooses heal or rageAction
+    // during the react phase. These execute independently of opponent intent —
+    // the player heals or rage strikes while simultaneously taking whatever the
+    // opponent does.
+    private void applyPlayerHealOrRage(String action) {
+        if ("heal".equals(action)) {
+            int healAmount = (int) (8 + Math.random() * 8);
+            battle.setPlayerHP(Math.min(battle.getMaxHP(), battle.getPlayerHP() + healAmount));
+            battle.setPlayerRage(Math.max(0, battle.getPlayerRage() - 8));
+            battle.setHealAmount(healAmount);
+            battle.setSlot1Result("Player healed " + healAmount + " HP! (-8 rage)");
+        } else if ("rageAction".equals(action)) {
+            int damage = (int) (20 + Math.random() * 10);
+            battle.setOpponentHP(battle.getOpponentHP() - damage);
+            battle.setPlayerHP(battle.getPlayerHP() - 3);
+            battle.setPlayerRage(0);
+            battle.setDamageDealtToOpponent(battle.getDamageDealtToOpponent() + damage);
+            battle.setTotalDamageDealtByPlayer(battle.getTotalDamageDealtByPlayer() + damage);
+            battle.setSlot1Result("RAGE STRIKE for " + damage + " damage! Rage reset to 0.");
         }
-
-        int damage    = 0;
-        int rageChange = battle.getRageChange(); // carry forward from slot1 resolution
-        String result  = "";
-
-        switch (action) {
-
-            case "punch":
-                damage = (int) (5 + Math.random() * 6);
-                battle.setOpponentHP(battle.getOpponentHP() - damage);
-                rageChange += 3;
-                battle.setDamageDealtToOpponent(battle.getDamageDealtToOpponent() + damage);
-                battle.setTotalDamageDealtByPlayer(battle.getTotalDamageDealtByPlayer() + damage);
-                result = "Player punched for " + damage + " damage! (+3 rage)";
-                break;
-
-            case "kick":
-                // Same logic as the main turn kick — drain rage, transfer to player, deal no damage
-                int opponentRageBeforeKick = battle.getOpponentRage();
-
-                if (opponentRageBeforeKick <= 0) {
-                    result = "Kick connects but opponent has no rage to drain!";
-                    break;
-                }
-
-                int rageDrained = Math.min(battle.getKickRageDrain(), opponentRageBeforeKick);
-                battle.setOpponentRage(battle.getOpponentRage() - rageDrained);
-                rageChange += rageDrained;
-                battle.setOpponentRageDrained(battle.getOpponentRageDrained() + rageDrained);
-                result = "Kick drains " + rageDrained + " rage from opponent! (+" + rageDrained + " player rage)";
-                break;
-
-            case "rageAction":
-                if (!battle.canRageStrike()) {
-                    result = "Not enough rage!";
-                    break;
-                }
-                damage = (int) (20 + Math.random() * 10);
-                int rageBeforeStrike = battle.getPlayerRage() + rageChange;
-                battle.setOpponentHP(battle.getOpponentHP() - damage);
-                battle.setPlayerHP(battle.getPlayerHP() - 3);
-                rageChange = -rageBeforeStrike; // rage resets to 0
-                battle.setPlayerRage(0);
-                battle.setDamageDealtToOpponent(battle.getDamageDealtToOpponent() + damage);
-                battle.setTotalDamageDealtByPlayer(battle.getTotalDamageDealtByPlayer() + damage);
-                result = "RAGE STRIKE! " + damage + " damage! Rage reset to 0.";
-                break;
-
-            case "heal":
-                int rageCost = 8;
-                if (battle.getPlayerRage() < rageCost) {
-                    result = "Not enough rage to heal!";
-                    break;
-                }
-                int healAmount = (int) (8 + Math.random() * 8);
-                battle.setPlayerHP(Math.min(battle.getMaxHP(), battle.getPlayerHP() + healAmount));
-                rageChange -= rageCost;
-                battle.setHealAmount(healAmount);
-                result = "Player heals " + healAmount + " HP! (-" + rageCost + " rage)";
-                break;
-
-            case "block":
-                rageChange -= 2;
-                result = "Player braces. (-2 rage)";
-                break;
-
-            case "dodge":
-                rageChange -= 6;
-                result = "Player dodges. (-6 rage)";
-                break;
-
-            default:
-                result = "Unknown slot2 action: " + action;
-                break;
-        }
-
-        // Apply final rage change for this slot
-        battle.setPlayerRage(Math.max(0, Math.min(battle.getMaxRage(), battle.getPlayerRage() + rageChange)));
-        battle.setRageChange(rageChange);
-        battle.setSlot2Result(result);
-        battle.setLastAction((battle.getLastAction() != null ? battle.getLastAction() + " | " : "") + result);
     }
 
     // ── determineOpponentIntent ──────────────────────────────────────────────────
     private String determineOpponentIntent() {
-        double random      = Math.random();
-        int    opponentHP  = battle.getOpponentHP();
+        double random     = Math.random();
+        int    opponentHP = battle.getOpponentHP();
 
-        // Opponent is desperate — heals more often at low HP
         if (opponentHP < 30) {
             if (random < 0.5) return "heal";
             if (random < 0.8) return "attack";
             return "fireball";
         }
 
-        // Opponent is healthy — more aggressive
         if (random < 0.5) return "attack";
         if (random < 0.7) return "fireball";
         if (random < 0.9) return "heal";
@@ -271,7 +166,6 @@ public class BattleController {
         action = action.replace("\"", "").trim();
         System.out.println("Received action: '" + action + "'");
 
-        // Reset per-turn fields before resolving
         battle.setDamageDealtToOpponent(0);
         battle.setDamageDealtToPlayer(0);
         battle.setOpponentRageDrained(0);
@@ -301,7 +195,8 @@ public class BattleController {
         boolean playerDodging      = "dodge".equals(battle.getSlot1());
         boolean playerPunching     = "punch".equals(battle.getSlot1());
         boolean playerKicking      = "kick".equals(battle.getSlot1());
-        // punch interrupts with counter-damage; kick interrupts with rage drain
+        boolean playerHealing      = "heal".equals(battle.getSlot1());
+        boolean playerRageStriking = "rageAction".equals(battle.getSlot1());
         boolean playerInterrupting = playerPunching || playerKicking;
 
         int damage     = 0;
@@ -325,14 +220,12 @@ public class BattleController {
                     battle.setBlockedAmount(0);
                     battle.setSlot1Result("Dodge! Attack avoided completely! (+2 rage)");
                 } else if (playerPunching) {
-                    // Punch during opponent attack = trade — player takes hit but deals counter-damage
                     int counterDamage = (int) (3 + Math.random() * 4);
                     battle.setOpponentHP(battle.getOpponentHP() - counterDamage);
                     battle.setDamageDealtToOpponent(counterDamage);
                     rageChange += 3;
                     battle.setSlot1Result("Trade! Dealt " + counterDamage + " while taking hit! (+3 rage)");
                 } else if (playerKicking) {
-                    // Kick during opponent attack = rage drain — player still takes the hit
                     int opponentRageBeforeKick = battle.getOpponentRage();
                     if (opponentRageBeforeKick > 0) {
                         int rageDrained = Math.min(battle.getKickRageDrain(), opponentRageBeforeKick);
@@ -343,6 +236,9 @@ public class BattleController {
                     } else {
                         battle.setSlot1Result("Kick connects but opponent has no rage to drain!");
                     }
+                } else if (playerHealing || playerRageStriking) {
+                    // Player executes their action but still takes the hit
+                    applyPlayerHealOrRage(battle.getSlot1());
                 } else {
                     battle.setSlot1Result("Player took the hit!");
                 }
@@ -358,10 +254,9 @@ public class BattleController {
 
             case "fireball":
                 damage = (int) (12 + Math.random() * 8);
-                int fireballBlocked = 0;
 
                 if (playerBlocking) {
-                    fireballBlocked = (int) (damage * 0.4);
+                    int fireballBlocked = (int) (damage * 0.4);
                     damage          = damage - fireballBlocked;
                     rageChange     -= 4;
                     battle.setBlockedAmount(fireballBlocked);
@@ -371,9 +266,11 @@ public class BattleController {
                     rageChange += 2;
                     battle.setBlockedAmount(0);
                     battle.setSlot1Result("Dodge! Fireball avoided! (+2 rage)");
+                } else if (playerHealing || playerRageStriking) {
+                    // Fireball can't be interrupted but player still executes their action
+                    applyPlayerHealOrRage(battle.getSlot1());
                 }
-                // Punching or kicking during a fireball doesn't interrupt it —
-                // the opponent is casting at range, not in melee
+                // Punching or kicking during fireball doesn't interrupt — opponent casting at range
 
                 if (damage > 0) {
                     battle.setPlayerHP(battle.getPlayerHP() - damage);
@@ -388,7 +285,6 @@ public class BattleController {
                 int healAmount = (int) (8 + Math.random() * 8);
 
                 if (playerPunching) {
-                    // Punch interrupts healing — deals damage, halves the heal
                     int interruptDamage = (int) (3 + Math.random() * 4);
                     healAmount = healAmount / 2;
                     battle.setOpponentHP(battle.getOpponentHP() - interruptDamage);
@@ -396,23 +292,25 @@ public class BattleController {
                     rageChange += 3;
                     battle.setSlot1Result("Interrupted healing! (-" + interruptDamage + " opponent HP) (+3 rage)");
                 } else if (playerKicking) {
-                    // Kick during heal = drain rage instead of dealing damage
                     int opponentRageBeforeKick = battle.getOpponentRage();
                     if (opponentRageBeforeKick > 0) {
                         int rageDrained = Math.min(battle.getKickRageDrain(), opponentRageBeforeKick);
                         battle.setOpponentRage(battle.getOpponentRage() - rageDrained);
                         rageChange += rageDrained;
                         battle.setOpponentRageDrained(battle.getOpponentRageDrained() + rageDrained);
-                        healAmount = healAmount / 2; // also disrupts the heal somewhat
+                        healAmount = healAmount / 2;
                         battle.setSlot1Result("Kick drained " + rageDrained + " rage during heal! Heal halved. (+" + rageDrained + " rage)");
                     } else {
                         battle.setSlot1Result("Kick during heal — opponent has no rage to drain!");
                     }
+                } else if (playerHealing || playerRageStriking) {
+                    // Both act simultaneously
+                    applyPlayerHealOrRage(battle.getSlot1());
                 } else {
                     battle.setSlot1Result("Opponent healed fully.");
                 }
 
-                battle.setOpponentHP(battle.getOpponentHP() + healAmount);
+                battle.setOpponentHP(Math.min(100, battle.getOpponentHP() + healAmount));
                 battle.setHealAmount(healAmount);
                 battle.setLastAction(separator + "Opponent heals for " + healAmount + " HP!");
                 break;
@@ -423,6 +321,9 @@ public class BattleController {
 
                 if (playerInterrupting) {
                     rageChange += 2;
+                } else if (playerHealing || playerRageStriking) {
+                    // Free action during charge — no damage taken
+                    applyPlayerHealOrRage(battle.getSlot1());
                 }
                 break;
         }
@@ -431,10 +332,9 @@ public class BattleController {
         battle.setPlayerRage(Math.max(0, Math.min(battle.getMaxRage(), battle.getPlayerRage() + rageChange)));
         battle.setRageChange(rageChange);
 
-        // Clear turn state ready for next round
+        // Clear turn state
         battle.setOpponentIntent(null);
         battle.setSlot1(null);
-        battle.setSlot2(null);
     }
 
     @PostMapping("/finish")

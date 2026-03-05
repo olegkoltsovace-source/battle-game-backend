@@ -8,8 +8,6 @@ public class BattleState {
     private int playerRage   = 0;
     private int opponentRage = MAX_RAGE;  // opponent starts at full rage — the player can drain it
     private int blockedAmount;
-    private int maxHP        = 100;
-    private int maxRage      = 30;
     private static final int MAX_HP              = 100;
     private static final int MAX_RAGE            = 30;
     private static final int RAGE_STRIKE_THRESHOLD = 20;
@@ -18,7 +16,6 @@ public class BattleState {
     // ── Turn state ──────────────────────────────────────────────
     private String opponentIntent = null; // "attack" | "fireball" | "heal" | "charge"
     private String slot1          = null; // player's reaction during opponent action
-    private String slot2          = null; // player's action after opponent action
     private int    timeWindow     = 4;    // seconds player has to queue actions
 
     // ── Resolution results (sent to frontend each turn) ─────────
@@ -28,7 +25,6 @@ public class BattleState {
     private int    opponentRageDrained   = 0;  // how much rage the kick stole this turn
     private int    healAmount            = 0;
     private String slot1Result           = null;
-    private String slot2Result           = null;
     private String lastAction            = null;
 
     // ── Battle status ───────────────────────────────────────────
@@ -66,9 +62,6 @@ public class BattleState {
     public String getSlot1() { return slot1; }
     public void setSlot1(String slot1) { this.slot1 = slot1; }
 
-    public String getSlot2() { return slot2; }
-    public void setSlot2(String slot2) { this.slot2 = slot2; }
-
     public int getTimeWindow() { return timeWindow; }
     public void setTimeWindow(int timeWindow) { this.timeWindow = timeWindow; }
 
@@ -86,9 +79,6 @@ public class BattleState {
 
     public String getSlot1Result() { return slot1Result; }
     public void setSlot1Result(String slot1Result) { this.slot1Result = slot1Result; }
-
-    public String getSlot2Result() { return slot2Result; }
-    public void setSlot2Result(String slot2Result) { this.slot2Result = slot2Result; }
 
     public String getLastAction() { return lastAction; }
     public void setLastAction(String lastAction) { this.lastAction = lastAction; }
