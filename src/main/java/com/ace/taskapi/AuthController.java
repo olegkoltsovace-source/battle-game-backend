@@ -5,7 +5,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -26,7 +25,7 @@ public class AuthController {
     // with BCrypt, saves the user, and returns a JWT so the user is
     // immediately logged in after registering.
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody Map<String, String> request) {
+    public ResponseEntity<AuthResponse> register(@RequestBody Map<String, String> request) {
         String username = request.get("username");
         String password = request.get("password");
 
@@ -50,13 +49,9 @@ public class AuthController {
         // Generate JWT so the user is logged in immediately after registering
         String token = jwtService.generateToken(username);
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("token", token);
-        response.put("userId", user.getId());
-        response.put("username", user.getUsername());
-        response.put("message", "Registration successful");
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(new AuthResponse(
+                token, user.getId(), user.getUsername(), 0, 0, "Registration successful"
+        ));
     }
 
     // ── Login ─────────────────────────────────────────────────
@@ -65,7 +60,7 @@ public class AuthController {
     // We return the same error message for both "user not found" and "wrong password"
     // intentionally — telling an attacker which one is correct is a security risk.
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> request) {
+    public ResponseEntity<AuthResponse> login(@RequestBody Map<String, String> request) {
         String username = request.get("username");
         String password = request.get("password");
 
@@ -79,14 +74,9 @@ public class AuthController {
 
         String token = jwtService.generateToken(username);
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("token", token);
-        response.put("userId", user.getId());
-        response.put("username", user.getUsername());
-        response.put("totalWins", user.getTotalWins());
-        response.put("totalLosses", user.getTotalLosses());
-        response.put("message", "Login successful");
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(new AuthResponse(
+                token, user.getId(), user.getUsername(),
+                user.getTotalWins(), user.getTotalLosses(), "Login successful"
+        ));
     }
 }
