@@ -39,12 +39,12 @@ public class BattleController {
         return battle;
     }
 
-    @PostMapping("/telegraph")
-    public BattleState telegraph() {
-        // String intent = determineOpponentIntent();
-        // battle.setOpponentIntent(intent);
-        return battle;
-    }
+//    @PostMapping("/telegraph")
+//    public BattleState telegraph() {
+//        // String intent = determineOpponentIntent();
+//        // battle.setOpponentIntent(intent);
+//        return battle;
+//    }
 
     @PostMapping("/react")
     public BattleState react(@RequestBody ReactRequest request) {
