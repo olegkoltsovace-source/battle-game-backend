@@ -35,13 +35,14 @@ public class BattleController {
     @PostMapping("/start")
     public BattleState startBattle() {
         battle = new BattleState();
+        battle.setOpponentIntent(determineOpponentIntent());
         return battle;
     }
 
     @PostMapping("/telegraph")
     public BattleState telegraph() {
-        String intent = determineOpponentIntent();
-        battle.setOpponentIntent(intent);
+        // String intent = determineOpponentIntent();
+        // battle.setOpponentIntent(intent);
         return battle;
     }
 
