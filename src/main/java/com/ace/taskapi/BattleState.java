@@ -2,68 +2,71 @@ package com.ace.taskapi;
 
 public class BattleState {
 
-    // ── Core stats ─────────────────────────────────────────────
+    // ── Core stats ────────────────────────────────────────────
     private int playerHP     = 100;
     private int opponentHP   = 100;
     private int playerRage   = 0;
-    private int opponentRage = MAX_RAGE;  // opponent starts at full rage — the player can drain it
-    private int blockedAmount;
-    private static final int MAX_HP              = 100;
-    private static final int MAX_RAGE            = 30;
-    private static final int RAGE_STRIKE_THRESHOLD = 20;
-    private static final int KICK_RAGE_DRAIN     = 7;   // how much rage kick steals from opponent
+    private int opponentRage = 0;   // both start at 0 — rage is built through combat
 
-    // ── Turn state ──────────────────────────────────────────────
-    private String opponentIntent = null; // "attack" | "fireball" | "heal" | "charge"
-    private String slot1          = null; // player's reaction during opponent action
-    private int    timeWindow     = 4;    // seconds player has to queue actions
+    // ── Constants ─────────────────────────────────────────────
+    private static final int MAX_HP             = 100;
+    private static final int MAX_RAGE           = 30;
+    private static final int MIN_RAGE           = -20;
+    private static final int FIREBALL_THRESHOLD = 30;  // rage required to fireball
+    private static final int HEAL_THRESHOLD     = 10;  // rage required to heal
 
-    // ── Resolution results (sent to frontend each turn) ─────────
+    // ── Turn state ────────────────────────────────────────────
+    private String opponentIntent = null;  // "punch" | "kick" | "fireball" | "heal"
+    private String slot1          = null;  // player's chosen reaction
+
+    // ── Resolution results (sent to frontend each turn) ───────
     private int    damageDealtToOpponent = 0;
     private int    damageDealtToPlayer   = 0;
-    private int    rageChange            = 0;  // net player rage change this turn
-    private int    opponentRageDrained   = 0;  // how much rage the kick stole this turn
+    private int    playerRageDrained     = 0;
+    private int    opponentRageDrained   = 0;
     private int    healAmount            = 0;
+    private int    blockedAmount         = 0;
     private String slot1Result           = null;
-    private String lastAction            = null;
 
-    // ── Battle status ───────────────────────────────────────────
-    private boolean battleOver              = false;
-    private String  winner                  = null;
+    // ── Battle status ─────────────────────────────────────────
+    private boolean battleOver               = false;
+    private String  winner                   = null;
     private int     totalDamageDealtByPlayer = 0;
 
-    // ── Getters and setters ─────────────────────────────────────
+    // ── Getters and setters ───────────────────────────────────
+
     public int getPlayerHP() { return playerHP; }
-    public void setPlayerHP(int playerHP) { this.playerHP = Math.max(0, Math.min(MAX_HP, playerHP)); }
+    public void setPlayerHP(int hp) { this.playerHP = Math.max(0, Math.min(MAX_HP, hp)); }
 
     public int getOpponentHP() { return opponentHP; }
-    public void setOpponentHP(int opponentHP) { this.opponentHP = Math.max(0, Math.min(MAX_HP, opponentHP)); }
+    public void setOpponentHP(int hp) { this.opponentHP = Math.max(0, Math.min(MAX_HP, hp)); }
+
+    public int getPlayerRage() { return playerRage; }
+    public void setPlayerRage(int rage) { this.playerRage = Math.max(MIN_RAGE, Math.min(MAX_RAGE, rage)); }
+
+    public int getOpponentRage() { return opponentRage; }
+    public void setOpponentRage(int rage) { this.opponentRage = Math.max(MIN_RAGE, Math.min(MAX_RAGE, rage)); }
 
     public int getBlockedAmount() { return blockedAmount; }
     public void setBlockedAmount(int blockedAmount) { this.blockedAmount = blockedAmount; }
 
-    public int getPlayerRage() { return playerRage; }
-    public void setPlayerRage(int playerRage) { this.playerRage = Math.max(0, Math.min(MAX_RAGE, playerRage)); }
-
-    public int getOpponentRage() { return opponentRage; }
-    public void setOpponentRage(int opponentRage) { this.opponentRage = Math.max(0, Math.min(MAX_RAGE, opponentRage)); }
-
     public int getOpponentRageDrained() { return opponentRageDrained; }
-    public void setOpponentRageDrained(int opponentRageDrained) { this.opponentRageDrained = opponentRageDrained; }
+    public void setOpponentRageDrained(int drained) { this.opponentRageDrained = drained; }
 
-    public int getMaxRage() { return MAX_RAGE; }
-    public int getRageStrikeThreshold() { return RAGE_STRIKE_THRESHOLD; }
-    public int getKickRageDrain() { return KICK_RAGE_DRAIN; }
+    public int getPlayerRageDrained() { return playerRageDrained; }
+    public void setPlayerRageDrained(int drained) { this.playerRageDrained = drained; }
+
     public int getMaxHP() { return MAX_HP; }
+    public int getMaxRage() { return MAX_RAGE; }
+    public int getMinRage() { return MIN_RAGE; }
+    public int getFireballThreshold() { return FIREBALL_THRESHOLD; }
+    public int getHealThreshold() { return HEAL_THRESHOLD; }
 
     public String getOpponentIntent() { return opponentIntent; }
-    public void setOpponentIntent(String opponentIntent) { this.opponentIntent = opponentIntent; }
+    public void setOpponentIntent(String intent) { this.opponentIntent = intent; }
 
     public String getSlot1() { return slot1; }
     public void setSlot1(String slot1) { this.slot1 = slot1; }
-
-    public int getTimeWindow() { return timeWindow; }
-    public void setTimeWindow(int timeWindow) { this.timeWindow = timeWindow; }
 
     public int getDamageDealtToOpponent() { return damageDealtToOpponent; }
     public void setDamageDealtToOpponent(int d) { this.damageDealtToOpponent = d; }
@@ -71,17 +74,11 @@ public class BattleState {
     public int getDamageDealtToPlayer() { return damageDealtToPlayer; }
     public void setDamageDealtToPlayer(int d) { this.damageDealtToPlayer = d; }
 
-    public int getRageChange() { return rageChange; }
-    public void setRageChange(int rageChange) { this.rageChange = rageChange; }
-
     public int getHealAmount() { return healAmount; }
     public void setHealAmount(int healAmount) { this.healAmount = healAmount; }
 
     public String getSlot1Result() { return slot1Result; }
-    public void setSlot1Result(String slot1Result) { this.slot1Result = slot1Result; }
-
-    public String getLastAction() { return lastAction; }
-    public void setLastAction(String lastAction) { this.lastAction = lastAction; }
+    public void setSlot1Result(String result) { this.slot1Result = result; }
 
     public boolean isBattleOver() { return battleOver; }
     public void setBattleOver(boolean battleOver) { this.battleOver = battleOver; }
@@ -92,5 +89,7 @@ public class BattleState {
     public int getTotalDamageDealtByPlayer() { return totalDamageDealtByPlayer; }
     public void setTotalDamageDealtByPlayer(int t) { this.totalDamageDealtByPlayer = t; }
 
-    public boolean canRageStrike() { return playerRage >= RAGE_STRIKE_THRESHOLD; }
+    // ── Convenience checks ────────────────────────────────────
+    public boolean canFireball() { return playerRage >= FIREBALL_THRESHOLD; }
+    public boolean canHeal()     { return playerRage >= HEAL_THRESHOLD; }
 }
