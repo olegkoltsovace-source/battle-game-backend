@@ -46,27 +46,34 @@ public class JwtFilter extends OncePerRequestFilter {
         }
 
         // Extract the token — strip the "Bearer " prefix
-        final String token    = authHeader.substring(7);
-        final String username = jwtService.extractUsername(token);
+        final String token = authHeader.substring(7);
 
-        // Only authenticate if we have a username and no authentication exists yet
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+        try {
+            final String username = jwtService.extractUsername(token);
 
-            if (jwtService.isTokenValid(token, userDetails.getUsername())) {
-                // Token is valid — create an authentication object and set it in the context
-                // This tells Spring Security the request is authenticated
-                UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                Collections.emptyList()
-                        );
-                authToken.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request)
-                );
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+            // Only authenticate if we have a username and no authentication exists yet
+            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+                if (jwtService.isTokenValid(token, userDetails.getUsername())) {
+                    // Token is valid — create an authentication object and set it in the context
+                    // This tells Spring Security the request is authenticated
+                    UsernamePasswordAuthenticationToken authToken =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails,
+                                    null,
+                                    Collections.emptyList()
+                            );
+                    authToken.setDetails(
+                            new WebAuthenticationDetailsSource().buildDetails(request)
+                    );
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
+        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            // Token expired — continue unauthenticated, SecurityConfig will reject protected routes
+        } catch (Exception e) {
+            // Any other token parsing error — treat as unauthenticated
         }
 
         // Continue the request — SecurityConfig will allow or reject based on auth status
