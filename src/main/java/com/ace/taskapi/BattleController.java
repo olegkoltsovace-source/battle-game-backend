@@ -7,7 +7,6 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/battle")
-@CrossOrigin(origins = "http://localhost:5173")
 public class BattleController {
 
     private BattleState battle = new BattleState();
@@ -38,13 +37,6 @@ public class BattleController {
         battle.setOpponentIntent(determineOpponentIntent());
         return battle;
     }
-
-//    @PostMapping("/telegraph")
-//    public BattleState telegraph() {
-//        // String intent = determineOpponentIntent();
-//        // battle.setOpponentIntent(intent);
-//        return battle;
-//    }
 
     @PostMapping("/react")
     public BattleState react(@RequestBody ReactRequest request) {
