@@ -19,14 +19,16 @@ public class BattleController {
 
     // ── Constants ─────────────────────────────────────────────
     private static final int PUNCH_DAMAGE        = 10;
-    private static final int PUNCH_RAGE_GAIN     = 5;   // rage gained by the one being hit
+    private static final int PUNCH_RAGE_GAIN     = 5;
     private static final int KICK_RAGE_DRAIN     = 10;
-    private static final int KICK_RAGE_GAIN      = 10;  // rage gained by the kicker
+    private static final int KICK_RAGE_GAIN      = 10;
     private static final int FIREBALL_DAMAGE     = 25;
     private static final int FIREBALL_RAGE_COST  = 30;
     private static final int HEAL_AMOUNT         = 15;
     private static final int HEAL_RAGE_COST      = 10;
-    private static final int BLOCK_DAMAGE_REDUCE = 2;   // divides damage by 2
+    private static final int BLOCK_DAMAGE_REDUCE = 2;
+    private static final int STUN_RAGE_COST      = 15;
+    private static final int STUN_HP_COST        = 10;
     private static final int RAGE_MIN            = -20;
     private static final int RAGE_MAX            = 30;
     private static final int MAX_HP              = 100;
@@ -43,7 +45,13 @@ public class BattleController {
         String slot1 = request.getSlot1() != null ? request.getSlot1() : "idle";
         battle.setSlot1(slot1);
 
+        // Save stun state from previous round before resetting
+        boolean opponentWasStunned = battle.isOpponentStunned();
+        boolean playerWasStunned   = battle.isPlayerStunned();
+
         // Reset per-turn fields
+        battle.setPlayerStunned(false);
+        battle.setOpponentStunned(false);
         battle.setDamageDealtToOpponent(0);
         battle.setDamageDealtToPlayer(0);
         battle.setHealAmount(0);
@@ -51,7 +59,7 @@ public class BattleController {
         battle.setPlayerRageDrained(0);
         battle.setSlot1Result(null);
 
-        handleOpponentAction();
+        handleOpponentAction(opponentWasStunned, playerWasStunned);
 
         if (battle.getOpponentHP() <= 0) {
             battle.setBattleOver(true);
@@ -62,7 +70,11 @@ public class BattleController {
         }
 
         if (!battle.isBattleOver()) {
-            battle.setOpponentIntent(determineOpponentIntent());
+            if (battle.isOpponentStunned()) {
+                battle.setOpponentIntent("stunned");
+            } else {
+                battle.setOpponentIntent(determineOpponentIntent());
+            }
         }
 
         return battle;
@@ -91,7 +103,6 @@ public class BattleController {
     }
 
     // ── handlePlayerAction ────────────────────────────────────
-    // Handles the player's free action before the telegraph phase.
     private void handlePlayerAction(String action) {
         switch (action) {
 
@@ -125,91 +136,105 @@ public class BattleController {
     }
 
     // ── handleOpponentAction ──────────────────────────────────
-    // Resolves the opponent's telegraphed intent against the player's chosen reaction.
-    // Both sides act simultaneously — the player's action always executes regardless
-    // of opponent intent, and the opponent's action always executes regardless of
-    // player reaction, except where block explicitly reduces damage.
-    private void handleOpponentAction() {
-        String intent  = battle.getOpponentIntent();
-        String slot1   = battle.getSlot1();
-
-        boolean playerBlocking     = "block".equals(slot1);
+    private void handleOpponentAction(boolean opponentWasStunned, boolean playerWasStunned) {
+        String  intent        = battle.getOpponentIntent();
+        String  slot1         = battle.getSlot1();
+        boolean playerBlocking = "block".equals(slot1);
 
         // ── Execute player reaction ───────────────────────────
-        switch (slot1) {
+        // Skip if opponent was stunned last round — player's action has no target
+        if (!playerWasStunned) {
+            switch (slot1) {
 
-            case "punch":
-                // Player punches — deals damage, opponent gains rage
-                battle.setOpponentHP(battle.getOpponentHP() - PUNCH_DAMAGE);
-                battle.setOpponentRage(clampRage(battle.getOpponentRage() + PUNCH_RAGE_GAIN));
-                battle.setDamageDealtToOpponent(PUNCH_DAMAGE);
-                battle.setTotalDamageDealtByPlayer(battle.getTotalDamageDealtByPlayer() + PUNCH_DAMAGE);
-                break;
+                case "punch":
+                    battle.setOpponentHP(battle.getOpponentHP() - PUNCH_DAMAGE);
+                    battle.setOpponentRage(clampRage(battle.getOpponentRage() + PUNCH_RAGE_GAIN));
+                    battle.setDamageDealtToOpponent(PUNCH_DAMAGE);
+                    battle.setTotalDamageDealtByPlayer(battle.getTotalDamageDealtByPlayer() + PUNCH_DAMAGE);
+                    break;
 
-            case "kick":
-                int previousOpponentRage = battle.getOpponentRage();
-                battle.setOpponentRage(clampRage(battle.getOpponentRage() - KICK_RAGE_DRAIN));
-                battle.setPlayerRage(clampRage(battle.getPlayerRage() + KICK_RAGE_GAIN));
-                int actualDrained = previousOpponentRage - battle.getOpponentRage();
-                battle.setOpponentRageDrained(actualDrained);
-                break;
+                case "kick":
+                    int previousOpponentRage = battle.getOpponentRage();
+                    battle.setOpponentRage(clampRage(battle.getOpponentRage() - KICK_RAGE_DRAIN));
+                    battle.setPlayerRage(clampRage(battle.getPlayerRage() + KICK_RAGE_GAIN));
+                    int actualDrained = previousOpponentRage - battle.getOpponentRage();
+                    battle.setOpponentRageDrained(actualDrained);
+                    break;
 
-            case "rageAction":
-                // Player fireballs — deals damage, resets own rage to 0
-                battle.setOpponentHP(battle.getOpponentHP() - FIREBALL_DAMAGE);
-                battle.setPlayerRage(0);
-                battle.setDamageDealtToOpponent(FIREBALL_DAMAGE);
-                battle.setTotalDamageDealtByPlayer(battle.getTotalDamageDealtByPlayer() + FIREBALL_DAMAGE);
-                break;
+                case "rageAction":
+                    battle.setOpponentHP(battle.getOpponentHP() - FIREBALL_DAMAGE);
+                    battle.setPlayerRage(0);
+                    battle.setDamageDealtToOpponent(FIREBALL_DAMAGE);
+                    battle.setTotalDamageDealtByPlayer(battle.getTotalDamageDealtByPlayer() + FIREBALL_DAMAGE);
+                    break;
 
-            case "heal":
-                // Player heals — gains HP, loses rage
-                battle.setPlayerHP(Math.min(MAX_HP, battle.getPlayerHP() + HEAL_AMOUNT));
-                battle.setPlayerRage(clampRage(battle.getPlayerRage() - HEAL_RAGE_COST));
-                battle.setHealAmount(HEAL_AMOUNT);
-                break;
+                case "heal":
+                    battle.setPlayerHP(Math.min(MAX_HP, battle.getPlayerHP() + HEAL_AMOUNT));
+                    battle.setPlayerRage(clampRage(battle.getPlayerRage() - HEAL_RAGE_COST));
+                    battle.setHealAmount(HEAL_AMOUNT);
+                    break;
 
-            case "block":
-            case "idle":
-            default:
-                // Player blocks or does nothing — handled below when opponent acts
-                break;
+                case "stun":
+                    // Player pays the cost and stuns the opponent next round
+                    battle.setPlayerHP(battle.getPlayerHP() - STUN_HP_COST);
+                    battle.setPlayerRage(clampRage(battle.getPlayerRage() - STUN_RAGE_COST));
+                    battle.setOpponentStunned(true);
+                    break;
+
+                case "block":
+                case "idle":
+                default:
+                    break;
+            }
         }
 
         // ── Execute opponent intent ───────────────────────────
-        switch (intent != null ? intent : "punch") {
+        // Skip if player was stunned last round — opponent acts freely but player can't react
+        // Also skip if intent is "stunned" (opponent is stunned this round)
+        if (!opponentWasStunned && !"stunned".equals(intent)) {
+            switch (intent != null ? intent : "punch") {
 
-            case "punch":
-                int punchDamage = PUNCH_DAMAGE;
-                if (playerBlocking) punchDamage /= BLOCK_DAMAGE_REDUCE;
-                battle.setPlayerHP(battle.getPlayerHP() - punchDamage);
-                battle.setPlayerRage(clampRage(battle.getPlayerRage() + PUNCH_RAGE_GAIN));
-                battle.setDamageDealtToPlayer(punchDamage);
-                battle.setBlockedAmount(playerBlocking ? PUNCH_DAMAGE - punchDamage : 0);
-                break;
+                case "punch":
+                    int punchDamage = PUNCH_DAMAGE;
+                    if (playerBlocking) punchDamage /= BLOCK_DAMAGE_REDUCE;
+                    battle.setPlayerHP(battle.getPlayerHP() - punchDamage);
+                    battle.setPlayerRage(clampRage(battle.getPlayerRage() + PUNCH_RAGE_GAIN));
+                    battle.setDamageDealtToPlayer(punchDamage);
+                    battle.setBlockedAmount(playerBlocking ? PUNCH_DAMAGE - punchDamage : 0);
+                    break;
 
-            case "kick":
-                int previousPlayerRage = battle.getPlayerRage();
-                battle.setPlayerRage(clampRage(battle.getPlayerRage() - KICK_RAGE_DRAIN));
-                battle.setOpponentRage(clampRage(battle.getOpponentRage() + KICK_RAGE_GAIN));
-                int actualPlayerRageDrained = previousPlayerRage - battle.getPlayerRage();
-                battle.setPlayerRageDrained(actualPlayerRageDrained);
-                break;
+                case "kick":
+                    int previousPlayerRage = battle.getPlayerRage();
+                    battle.setPlayerRage(clampRage(battle.getPlayerRage() - KICK_RAGE_DRAIN));
+                    battle.setOpponentRage(clampRage(battle.getOpponentRage() + KICK_RAGE_GAIN));
+                    int actualPlayerRageDrained = previousPlayerRage - battle.getPlayerRage();
+                    battle.setPlayerRageDrained(actualPlayerRageDrained);
+                    break;
 
-            case "fireball":
-                int fireballDamage = FIREBALL_DAMAGE;
-                if (playerBlocking) fireballDamage /= BLOCK_DAMAGE_REDUCE;
-                battle.setPlayerHP(battle.getPlayerHP() - fireballDamage);
-                battle.setPlayerRage(clampRage(battle.getPlayerRage() + PUNCH_RAGE_GAIN));
-                battle.setDamageDealtToPlayer(fireballDamage);
-                battle.setBlockedAmount(playerBlocking ? FIREBALL_DAMAGE - fireballDamage : 0);
-                battle.setOpponentRage(0); // opponent rage resets after firing
-                break;
+                case "fireball":
+                    int fireballDamage = FIREBALL_DAMAGE;
+                    if (playerBlocking) fireballDamage /= BLOCK_DAMAGE_REDUCE;
+                    battle.setPlayerHP(battle.getPlayerHP() - fireballDamage);
+                    battle.setPlayerRage(clampRage(battle.getPlayerRage() + PUNCH_RAGE_GAIN));
+                    battle.setDamageDealtToPlayer(fireballDamage);
+                    battle.setBlockedAmount(playerBlocking ? FIREBALL_DAMAGE - fireballDamage : 0);
+                    battle.setOpponentRage(0);
+                    break;
 
-            case "heal":
-                battle.setOpponentHP(Math.min(MAX_HP, battle.getOpponentHP() + HEAL_AMOUNT));
-                battle.setOpponentRage(clampRage(battle.getOpponentRage() - HEAL_RAGE_COST));
-                break;
+                case "heal":
+                    battle.setOpponentHP(Math.min(MAX_HP, battle.getOpponentHP() + HEAL_AMOUNT));
+                    battle.setOpponentRage(clampRage(battle.getOpponentRage() - HEAL_RAGE_COST));
+                    break;
+
+                case "stun":
+                    // Opponent stuns the player — blocked if player is blocking
+                    if (!playerBlocking) {
+                        battle.setPlayerStunned(true);
+                    }
+                    battle.setOpponentHP(battle.getOpponentHP() - STUN_HP_COST);
+                    battle.setOpponentRage(clampRage(battle.getOpponentRage() - STUN_RAGE_COST));
+                    break;
+            }
         }
 
         // Clear turn state
@@ -225,6 +250,8 @@ public class BattleController {
 
         boolean canFireball = opponentRage >= FIREBALL_RAGE_COST;
         boolean canHeal     = opponentRage >= HEAL_RAGE_COST;
+        boolean canStun     = opponentRage >= BattleState.STUN_THRESHOLD
+                && opponentHP > STUN_HP_COST;
 
         // Desperate — low HP, prioritize healing if affordable
         if (opponentHP < 30) {
@@ -235,6 +262,9 @@ public class BattleController {
 
         // Full rage — use fireball
         if (canFireball && random < 0.6) return "fireball";
+
+        // Stun — occasional threat
+        if (canStun && random < 0.9) return "stun";
 
         // Can heal — occasionally heal
         if (canHeal && random < 0.3) return "heal";

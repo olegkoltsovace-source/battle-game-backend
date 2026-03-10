@@ -14,6 +14,7 @@ public class BattleState {
     private static final int MIN_RAGE           = -20;
     private static final int FIREBALL_THRESHOLD = 30;  // rage required to fireball
     private static final int HEAL_THRESHOLD     = 10;  // rage required to heal
+    public static final int STUN_THRESHOLD = 15;
 
     // ── Turn state ────────────────────────────────────────────
     private String opponentIntent = null;  // "punch" | "kick" | "fireball" | "heal"
@@ -27,6 +28,8 @@ public class BattleState {
     private int    healAmount            = 0;
     private int    blockedAmount         = 0;
     private String slot1Result           = null;
+    private boolean playerStunned = false;
+    private boolean opponentStunned = false;
 
     // ── Battle status ─────────────────────────────────────────
     private boolean battleOver               = false;
@@ -59,8 +62,11 @@ public class BattleState {
     public int getMaxHP() { return MAX_HP; }
     public int getMaxRage() { return MAX_RAGE; }
     public int getMinRage() { return MIN_RAGE; }
+
     public int getFireballThreshold() { return FIREBALL_THRESHOLD; }
     public int getHealThreshold() { return HEAL_THRESHOLD; }
+
+    public int getStunThreshold() { return STUN_THRESHOLD; }
 
     public String getOpponentIntent() { return opponentIntent; }
     public void setOpponentIntent(String intent) { this.opponentIntent = intent; }
@@ -79,6 +85,12 @@ public class BattleState {
 
     public String getSlot1Result() { return slot1Result; }
     public void setSlot1Result(String result) { this.slot1Result = result; }
+
+    public boolean isPlayerStunned() { return playerStunned; }
+    public void setPlayerStunned(boolean playerStunned) { this.playerStunned = playerStunned; }
+
+    public boolean isOpponentStunned() { return opponentStunned; }
+    public void setOpponentStunned(boolean opponentStunned) { this.opponentStunned = opponentStunned; }
 
     public boolean isBattleOver() { return battleOver; }
     public void setBattleOver(boolean battleOver) { this.battleOver = battleOver; }
