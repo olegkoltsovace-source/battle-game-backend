@@ -27,6 +27,7 @@ public class BattleState {
     private int    opponentRageDrained   = 0;
     private int    healAmount            = 0;
     private int    blockedAmount         = 0;
+    private int    opponentBlockedAmount = 0;
     private String slot1Result           = null;
     private boolean playerStunned = false;
     private boolean opponentStunned = false;
@@ -82,6 +83,9 @@ public class BattleState {
 
     public int getHealAmount() { return healAmount; }
     public void setHealAmount(int healAmount) { this.healAmount = healAmount; }
+
+    public int getOpponentBlockedAmount() { return opponentBlockedAmount; }
+    public void setOpponentBlockedAmount(int opponentBlockedAmount) { this.opponentBlockedAmount = opponentBlockedAmount; }
 
     public String getSlot1Result() { return slot1Result; }
     public void setSlot1Result(String result) { this.slot1Result = result; }
